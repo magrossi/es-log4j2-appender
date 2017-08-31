@@ -296,12 +296,11 @@ public class ElasticSearchRestAppender extends AbstractAppender {
             @PluginAttribute("name") String name,
             @PluginElement("Filter") final Filter filter,
             @PluginElement("Layout") Layout<? extends Serializable> layout,
-            @PluginAttribute("jsonMessages") Boolean jsonMessages,
             @PluginAttribute("maxBulkSize") Integer maxBulkSize,
             @PluginAttribute("maxDelayTime") Long maxDelayTime,
             @PluginAttribute("index") String esIndex,
             @PluginAttribute("dateFormat") String dateFormat,
-            @PluginAttribute("type") String esType,
+            @PluginAttribute("esType") String esType,
             @PluginAttribute("hosts") String esHosts) {
 
         if (name == null) {
@@ -315,10 +314,6 @@ public class ElasticSearchRestAppender extends AbstractAppender {
         
         if (maxDelayTime == null) {
         	maxDelayTime = 2000L;
-        }
-        
-        if (jsonMessages == null) {
-        	jsonMessages = false;
         }
 
         HttpHost[] hosts = parseHosts(esHosts);
@@ -339,8 +334,13 @@ public class ElasticSearchRestAppender extends AbstractAppender {
         	esType = "log";
         }
         
-        if (layout == null) {
-        	layout = JsonLayout.createDefaultLayout();
+        if (layout == null) {       	
+        	layout = JsonLayout.newBuilder()
+        			.setCompact(true)
+        			.setIncludeStacktrace(true)
+        			.setLocationInfo(true)
+        			.setProperties(true)
+        			.build();
         }
 
         return new ElasticSearchRestAppender(name, filter, layout, true, maxDelayTime,
