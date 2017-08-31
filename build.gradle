@@ -11,6 +11,7 @@ repositories {
 }
 
 apply plugin: 'java'
+apply plugin: 'jacoco'
 apply plugin: 'eclipse'
 apply plugin: 'idea'
 
@@ -21,12 +22,20 @@ dependencies {
 
 	// ElasticSearch Rest Client
     compile 'org.elasticsearch.client:rest:5.5.2'
-    
+
     // Runtime Json dependencies
     runtime 'com.fasterxml.jackson.core:jackson-core:2.9.0'
-    runtime 'com.fasterxml.jackson.core:jackson-databind:2.9.0'        
+    runtime 'com.fasterxml.jackson.core:jackson-databind:2.9.0'
 
     // JUnit test framework
     testImplementation 'junit:junit:4.12'
 }
 
+jacocoTestReport {
+    reports {
+        xml.enabled = true
+        html.enabled = true
+    }
+}
+
+check.dependsOn jacocoTestReport
