@@ -3,6 +3,8 @@ jdk:
   - oraclejdk8
 services:
   - elasticsearch
+before_install:
+  - curl -O https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-5.4.3.deb && sudo dpkg -i --force-confnew elasticsearch-5.4.3.deb && sudo service elasticsearch restart
 before_script:
   - sleep 10
 after_success:
