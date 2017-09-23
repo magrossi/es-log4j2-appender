@@ -24,8 +24,8 @@ dependencies {
     compile 'org.elasticsearch.client:rest:5.5.2'
 
     // Runtime Json dependencies
-    runtime 'com.fasterxml.jackson.core:jackson-core:2.9.0'
-    runtime 'com.fasterxml.jackson.core:jackson-databind:2.9.0'
+    runtime 'com.fasterxml.jackson.core:jackson-core:2.9.1'
+    runtime 'com.fasterxml.jackson.core:jackson-databind:2.9.1'
 
     // JUnit test framework
     testImplementation 'junit:junit:4.12'

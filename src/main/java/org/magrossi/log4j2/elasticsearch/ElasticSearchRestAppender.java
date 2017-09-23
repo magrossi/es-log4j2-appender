@@ -1,16 +1,19 @@
 package org.magrossi.log4j2.elasticsearch;
 
 import java.io.Serializable;
+import java.nio.charset.Charset;
 import java.security.InvalidParameterException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.locks.*;
+import java.util.stream.Collectors;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
@@ -25,12 +28,12 @@ import org.apache.http.nio.entity.NStringEntity;
 import org.apache.logging.log4j.core.appender.AbstractAppender;
 import org.apache.logging.log4j.core.appender.AppenderLoggingException;
 import org.apache.logging.log4j.core.config.plugins.*;
+import org.apache.logging.log4j.core.config.plugins.validation.constraints.Required;
 import org.apache.logging.log4j.core.layout.JsonLayout;
-import org.apache.logging.log4j.status.StatusLogger;
+import org.apache.logging.log4j.util.Strings;
 import org.elasticsearch.client.Response;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestClientBuilder;
-import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.Filter;
 import org.apache.logging.log4j.core.Layout;
 import org.apache.logging.log4j.core.LogEvent;
@@ -38,17 +41,157 @@ import static org.apache.logging.log4j.core.Appender.ELEMENT_TYPE;
 import static org.apache.logging.log4j.core.Core.CATEGORY_NAME;
 
 /**
- * ElasticSearch REST Log4J appender
+ * Elastic REST Log4J2 appender that sends documents in bulk.
+ * Log messages are buffered and sent at pre-defined interval or
+ * when the message buffer gets filled (whichever comes first). * 
  */
 @Plugin(name = "ElasticSearch", category = CATEGORY_NAME, elementType = ELEMENT_TYPE, printObject = true)
 public class ElasticSearchRestAppender extends AbstractAppender {
 
-    private static final Logger LOGGER = StatusLogger.getLogger();
+    public static class Builder<B extends Builder<B>> extends AbstractAppender.Builder<B>
+		implements org.apache.logging.log4j.core.util.Builder<AbstractAppender> {
+
+        @PluginBuilderAttribute
+        @Required(message = "No esIndex provided")
+        private String esIndex;
+        
+        @PluginBuilderAttribute
+        private String dateFormat;
+
+        @PluginBuilderAttribute
+        @Required(message = "No esType provided")
+        private String esType;
+
+        @PluginBuilderAttribute
+        private String user;
+        
+        @PluginBuilderAttribute
+        private String password;
+
+        @PluginBuilderAttribute
+        private Integer maxBulkSize;
+        
+        @PluginBuilderAttribute
+        private Long maxDelayTime;
+        
+        @PluginElement("Hosts")
+        @Required(message = "No Elastic hosts provided")
+        private HttpAddress[] hosts;
+
+        public B withIndex(final String index) {
+            this.esIndex = index;
+            return asBuilder();
+        }
+        
+        public B withDateFormat(final String dateFormat) {
+            this.dateFormat = dateFormat;
+            return asBuilder();
+        }
+        
+        public B withType(final String type) {
+            this.esType = type;
+            return asBuilder();
+        }
+
+        public B withHosts(final HttpAddress... hosts) {
+            this.hosts = hosts;
+            return asBuilder();
+        }
+
+        public B withMaxBulkSize(final Integer maxBulkSize) {
+            this.maxBulkSize = maxBulkSize;
+            return asBuilder();
+        }
+        
+        public B withMaxDelayTime(final Long maxDelayTime) {
+            this.maxDelayTime = maxDelayTime;
+            return asBuilder();
+        }
+        
+        public B withCredentials(final String user, final String password) {
+        	this.user = user;
+        	this.password = password;
+        	return asBuilder();
+        }
+        
+    	@Override
+    	public Layout<? extends Serializable> getOrCreateLayout() {
+    		return getOrCreateLayout(Charset.defaultCharset());
+    	}
+
+    	@Override
+    	public Layout<? extends Serializable> getOrCreateLayout(final Charset charset) {
+            if (getLayout() == null) {
+                return JsonLayout.newBuilder()
+            			.setCompact(true)
+            			.setCharset(charset)
+            			.setIncludeStacktrace(true)
+            			.setLocationInfo(true)
+            			.setProperties(true)
+            			.build();
+            }
+            return getLayout();
+        }
+        
+        @Override
+        public ElasticSearchRestAppender build() {
+
+            if (this.getName() == null) {
+                LOGGER.error("No name provided for ElasticSearchRestAppender");
+                return null;
+            }
+
+            if (maxBulkSize == null || maxBulkSize < 0) {
+            	maxBulkSize = 200;
+            }
+            
+            if (maxDelayTime == null || maxDelayTime < 0) {
+            	maxDelayTime = 2000L;
+            }
+
+            HttpHost[] httpHosts;
+            if (hosts == null || hosts.length == 0) {
+    			LOGGER.warn("No hosts found for appender {} using [http://localhost:9200].", getName());
+    			httpHosts = new HttpHost[] { new HttpHost("localhost", 9200) };
+            } else {
+            	httpHosts = Arrays.asList(hosts).stream()
+            			.map(HttpAddress::getHttpHost)
+            			.collect(Collectors.toList())
+            			.toArray(new HttpHost[hosts.length]);
+            }
+            
+            if (Strings.isBlank(esIndex)) {
+            	LOGGER.warn("No esIndex found for appender {} using [logs-].", getName());
+            	esIndex = "logs-";
+            }
+            
+            if (dateFormat == null) {
+            	LOGGER.warn("No date format found for appender {} using [yyyyMMdd].", getName());
+            	dateFormat = "yyyyMMdd";
+            }
+            
+            if (Strings.isBlank(esType)) {
+            	LOGGER.warn("No esType found for appender {} using [log].", getName());
+            	esType = "log";
+            }
+
+            return new ElasticSearchRestAppender(getName(), getFilter(), getOrCreateLayout(), isIgnoreExceptions(),
+            		maxDelayTime, maxBulkSize, new SimpleDateFormat(dateFormat), esIndex, esType, user, password, httpHosts);
+        }
+
+    }
+	
+    @PluginBuilderFactory
+    public static <B extends Builder<B>> B newBuilder() {
+        return new Builder<B>().asBuilder();
+    }
+    
 	private static final String HTTP_METHOD = "POST";
     private final Lock lock = new ReentrantLock();
     private final RestClient restClient;
     private final String index;
     private final String type;
+    private final HttpHost[] hosts; 
     private final DateFormat dateFormat;
     private final String bulkItemFormat;
     private final int maxBulkSize;
@@ -60,104 +203,93 @@ public class ElasticSearchRestAppender extends AbstractAppender {
      * @param name The appender name
      * @param filter The appender filter
      * @param ignoreExceptions True if we are to ignore exceptions during logging
-     * @param jsonMessages Flag indicating that the log event message is a valid JSON string
      * @param maxDelayTime Max delay time before sending the messages to the database
      * @param maxBulkSize Max buffer size of messages held in memory before sending
-     * @param dateFormat Format of the timestamp that is appended to the index name while saving
-     * @param index The ElasticSearch destination index
-     * @param type The ElasticSearch destination type
+     * @param dateFormat Format of the timestamp that is appended to the esIndex name while saving
+     * @param esIndex The ElasticSearch destination esIndex
+     * @param esType The ElasticSearch destination esType
      * @param hosts List of ElasticSearch hosts in the cluster
      */
     protected ElasticSearchRestAppender(String name, Filter filter, Layout<? extends Serializable> layout, final boolean ignoreExceptions,
     		final long maxDelayTime, final int maxBulkSize, DateFormat dateFormat,
     		String index, String type, String user, String password, HttpHost... hosts) {
-        super(name, filter, initLayout(layout), ignoreExceptions);
+        super(name, filter, layout, ignoreExceptions);
         this.buffered = new ArrayList<>();
         this.timer = null;
         this.maxBulkSize = maxBulkSize;
         this.maxDelayTime = maxDelayTime;
         this.index = index;
         this.type = type;
+        this.hosts = hosts;
         this.dateFormat = dateFormat;
         this.bulkItemFormat = String.format("{ \"index\" : { \"_index\" : \"%s%%s\", \"_type\" : \"%s\" } }%n%%s%n", index, type);
         this.restClient = initClient(user, password, hosts);
+        this.validate();
     }
     
     private static RestClient initClient(String user, String password, HttpHost... hosts) {
     	return RestClient.builder(hosts)
-				.setHttpClientConfigCallback(new RestClientBuilder.HttpClientConfigCallback() {
-					@Override
-					public HttpAsyncClientBuilder customizeHttpClient(HttpAsyncClientBuilder httpClientBuilder) {
-						if (user != null && !user.trim().isEmpty()) {
-							CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
-							credentialsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials(user, password));
-			                return httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider);
-						} else {
-							return httpClientBuilder;
-						}
+			.setHttpClientConfigCallback(new RestClientBuilder.HttpClientConfigCallback() {
+				@Override
+				public HttpAsyncClientBuilder customizeHttpClient(HttpAsyncClientBuilder httpClientBuilder) {
+					if (!Strings.isBlank(user)) {
+						CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
+						credentialsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials(user, password));
+		                return httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider);
+					} else {
+						return httpClientBuilder;
 					}
-		        })
+				}
+	        })
 			.build();
     }
     
-    private static Layout<? extends Serializable> initLayout(Layout<? extends Serializable> layout) {
-        if (layout != null) {
-        	if (layout.getContentType().toLowerCase().contains("application/json")) {
-        		return layout;
-        	} else {
-        		throw new InvalidParameterException("Layout must produce an \"application/json\" content type. "
-        										  + "Instead it produces \"" + layout.getContentType() + "\"");
+    private void validate() {
+        if (getLayout() != null) {
+        	if (!getLayout().getContentType().toLowerCase().contains("application/json")) {
+        		throw new InvalidParameterException("Layout must produce an \"application/json\" content esType. "
+        										  + "Instead it produces \"" + getLayout().getContentType() + "\"");
         	}
         } else {
-        	return JsonLayout.createDefaultLayout();
+    		throw new InvalidParameterException("Layout not provided");
         }
     }
     
-    /**
-     * @param jsonMessage The json parsed message
-     * @return The full action metadata including timestamp
-     */
     private String getBulkItem(String jsonMessage) {
    		return String.format(bulkItemFormat, this.dateFormat.format(new Date()), jsonMessage);
     }
     
-    /**
-     * @see org.apache.logging.log4j.core.Appender#append(org.apache.logging.log4j.core.LogEvent)
-     */
     @Override
     public void append(LogEvent event) {
     	lock.lock();
         try {
-        	// Parse event and adds to buffer
         	String json = new String(getLayout().toByteArray(event));
         	buffered.add(getBulkItem(json));
-        	// Check timer and buffer size
         	this.checkSendToEs();        	
         } catch (Exception ex) {
             if (!ignoreExceptions()) {
                 throw new AppenderLoggingException(ex);
+            } else {
+            	LOGGER.error("Failed to process event.", ex);
             }
         } finally {
         	lock.unlock();
         }
     }
+
+    private void cancelTimer() {
+		if (timer != null) {
+			timer.cancel();
+			timer = null;
+		}
+    }
     
-    /**
-     * Checks if it should send the messages to the remote server
-     */
     private void checkSendToEs() {
-    	// Send if: buffered.size() >= maxBulkSize
-    	//      or: if timer == null, start timer
-    	if (buffered.size() >= this.maxBulkSize) {
-    		// Cancels timer
-    		if (timer != null) {
-    			timer.cancel();
-    			timer = null;
-    		}
-    		// Sends to remote
-    		this.sendToEs();
-    	} else if (timer == null) {
-    		// create timer
+    	if (this.maxBulkSize == 0 && this.maxDelayTime == 0) {
+    		sendToEs();
+    	} else if (this.maxBulkSize > 0 && buffered.size() >= this.maxBulkSize) {
+    		sendToEs();
+    	} else if (this.maxDelayTime > 0 && timer == null) {
     		timer = new Timer();
     		timer.schedule(new TimerTask() {				
 				@Override
@@ -165,8 +297,6 @@ public class ElasticSearchRestAppender extends AbstractAppender {
 					lock.lock();
 					try {
 						sendToEs();
-						timer.cancel();
-						timer = null;
 					} finally {
 						lock.unlock();
 					}
@@ -175,11 +305,9 @@ public class ElasticSearchRestAppender extends AbstractAppender {
     	}
     }
     
-    /**
-     * Send buffered messages to elastic
-     */
     private void sendToEs() {
     	try {
+			cancelTimer();
     		if (buffered.size() > 0) {
 	    		StringBuilder bulkRequestBody = new StringBuilder();
 	    		for (String bulkItem : buffered) {
@@ -195,7 +323,7 @@ public class ElasticSearchRestAppender extends AbstractAppender {
 		            if (!ignoreExceptions()) {
 		                throw new AppenderLoggingException(ex);
 		            } else {
-		            	LOGGER.error("Failed to send data to ElasticSearch server.", ex);
+		            	LOGGER.error("Failed to send data to Elastic server.", ex);
 		            }
 				}
     		}
@@ -204,147 +332,43 @@ public class ElasticSearchRestAppender extends AbstractAppender {
     	}
     }
     
-    /**
-     * @see org.apache.logging.log4j.core.AbstractLifeCycle#stop()
-     */
     @Override
     public void stop() {
-    	// cancel the timer
     	this.timer.cancel();
-    	// try to send the current buffer
     	this.sendToEs();
-    	// then we stop
     	super.stop();
     }
 
-    /**
-     * @param hosts List of comma (or semicolon) separated hostnames with port
-     * @return The array of hosts
-     */
-    protected static HttpHost[] parseHosts(String hosts) {
-		ArrayList<HttpHost> hostList = new ArrayList<>();
-    	if (hosts != null && !hosts.trim().isEmpty()) {
-    		String[] hostArray = hosts.split(",|;");
-    		for (String hostString : hostArray) {
-    			if (!hostString.trim().isEmpty()) {
-    				try {
-    					hostList.add(HttpHost.create(hostString.trim()));
-    				} catch (Exception e) {
-    					LOGGER.warn("Ignoring invalid host for ElasticSearchRestAppender " + hostString.trim());
-					}
-    			}
-    		}
-    	}
-    	
-    	if (hostList.size() == 0) {
-    		return null;
-    	} else {
-    		return hostList.toArray(new HttpHost[hostList.size()]);
-    	}
-
-    }
-
-    /**
-	 * @return the index
-	 */
-	protected String getIndex() {
+    protected String getIndex() {
 		return index;
 	}
 
-	/**
-	 * @return the type
-	 */
 	protected String getType() {
 		return type;
 	}
 
-	/**
-	 * @return the dateFormat
-	 */
 	protected DateFormat getDateFormat() {
 		return dateFormat;
 	}
 
-	/**
-	 * @return the maxBulkSize
-	 */
 	protected int getmaxBulkSize() {
 		return maxBulkSize;
 	}
 
-	/**
-	 * @return the maxDelayTime
-	 */
 	protected long getMaxDelayTime() {
 		return maxDelayTime;
 	}
 
-	/**
-   	 * @param name The appender name 
-	 * @param filter The appender filter
-	 * @param jsonMessages Flag indicating that the log event message is a valid JSON string
-     * @param maxBulkSize Max buffer size of messages held in memory before sending
-     * @param maxDelayTime Max delay time before sending the messages to the database
-     * @param esIndex The ElasticSearch destination index
-     * @param dateFormat Format of the timestamp that is appended to the index name while saving
-     * @param esType The ElasticSearch destination type
-     * @param esHosts Comma or semicolon separated list of ElasticSearch hosts in the cluster (ie. "http://node01.escluster.com:9200,http://node02.escluster.com:9200")
-     * @return The appender
-     */
-    @PluginFactory
-    public static ElasticSearchRestAppender createAppender(
-            @PluginAttribute("name") String name,
-            @PluginElement("Filter") final Filter filter,
-            @PluginElement("Layout") Layout<? extends Serializable> layout,
-            @PluginAttribute("maxBulkSize") Integer maxBulkSize,
-            @PluginAttribute("maxDelayTime") Long maxDelayTime,
-            @PluginAttribute("index") String esIndex,
-            @PluginAttribute("dateFormat") String dateFormat,
-            @PluginAttribute("esType") String esType,
-            @PluginAttribute("hosts") String esHosts) {
+	public RestClient getRestClient() {
+		return restClient;
+	}
 
-        if (name == null) {
-            LOGGER.error("No name provided for ElasticSearchRestAppender");
-            return null;
-        }
-        
-        if (maxBulkSize == null) {
-        	maxBulkSize = 200;
-        }
-        
-        if (maxDelayTime == null) {
-        	maxDelayTime = 2000L;
-        }
+	public int getMaxBulkSize() {
+		return maxBulkSize;
+	}
 
-        HttpHost[] hosts = parseHosts(esHosts);
-        if (hosts == null) {
-			LOGGER.warn("No hosts found for appender {} using [http://localhost:9200].", name);
-        	hosts = new HttpHost[] { new HttpHost("localhost", 9200) };
-        }
-        
-        if (esIndex == null || esIndex.trim().isEmpty()) {
-        	esIndex = "logs-";
-        }
-        
-        if (dateFormat == null) {
-        	dateFormat = "yyyyMMdd";        	
-        }
-        
-        if (esType == null || esType.trim().isEmpty()) {
-        	esType = "log";
-        }
-        
-        if (layout == null) {       	
-        	layout = JsonLayout.newBuilder()
-        			.setCompact(true)
-        			.setIncludeStacktrace(true)
-        			.setLocationInfo(true)
-        			.setProperties(true)
-        			.build();
-        }
+	public HttpHost[] getHosts() {
+		return hosts;
+	}
 
-        return new ElasticSearchRestAppender(name, filter, layout, true, maxDelayTime,
-        		maxBulkSize, new SimpleDateFormat(dateFormat), esIndex, esType, esHosts, esHosts, hosts);
-    }
-    
 }
