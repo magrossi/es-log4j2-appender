@@ -13,7 +13,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.magrossi.log4j2.elasticsearch;
+package com.github.magrossi.log4j2.elasticsearch;
 
 import java.io.Serializable;
 import java.nio.charset.Charset;
@@ -22,7 +22,6 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Timer;
@@ -30,25 +29,13 @@ import java.util.TimerTask;
 import java.util.concurrent.locks.*;
 import java.util.stream.Collectors;
 
-import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
-import org.apache.http.auth.AuthScope;
-import org.apache.http.auth.UsernamePasswordCredentials;
-import org.apache.http.client.CredentialsProvider;
-import org.apache.http.client.HttpResponseException;
-import org.apache.http.entity.ContentType;
-import org.apache.http.impl.client.BasicCredentialsProvider;
-import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
-import org.apache.http.nio.entity.NStringEntity;
 import org.apache.logging.log4j.core.appender.AbstractAppender;
 import org.apache.logging.log4j.core.appender.AppenderLoggingException;
 import org.apache.logging.log4j.core.config.plugins.*;
 import org.apache.logging.log4j.core.config.plugins.validation.constraints.Required;
 import org.apache.logging.log4j.core.layout.JsonLayout;
 import org.apache.logging.log4j.util.Strings;
-import org.elasticsearch.client.Response;
-import org.elasticsearch.client.RestClient;
-import org.elasticsearch.client.RestClientBuilder;
 import org.apache.logging.log4j.core.Filter;
 import org.apache.logging.log4j.core.Layout;
 import org.apache.logging.log4j.core.LogEvent;
@@ -93,6 +80,8 @@ public class ElasticSearchRestAppender extends AbstractAppender {
         @Required(message = "No Elastic hosts provided")
         private HttpAddress[] hosts;
 
+        private BulkSender bulkSender;
+
         public B withIndex(final String index) {
             this.esIndex = index;
             return asBuilder();
@@ -126,6 +115,11 @@ public class ElasticSearchRestAppender extends AbstractAppender {
         public B withCredentials(final String user, final String password) {
         	this.user = user;
         	this.password = password;
+        	return asBuilder();
+        }
+        
+        public B withBulkSender(final BulkSender bulkSender) {
+        	this.bulkSender = bulkSender;
         	return asBuilder();
         }
         
@@ -189,9 +183,15 @@ public class ElasticSearchRestAppender extends AbstractAppender {
             	LOGGER.warn("No esType found for appender {} using [log].", getName());
             	esType = "log";
             }
+            
+            if (bulkSender == null) {
+            	bulkSender = new ElasticBulkSender(user, password, httpHosts);
+            } else {
+            	LOGGER.warn("Appender {} using custom bulk sender {}.", getName(), bulkSender.getClass().getName());
+            }
 
             return new ElasticSearchRestAppender(getName(), getFilter(), getOrCreateLayout(), isIgnoreExceptions(),
-            		maxDelayTime, maxBulkSize, new SimpleDateFormat(dateFormat), esIndex, esType, user, password, httpHosts);
+            		maxDelayTime, maxBulkSize, new SimpleDateFormat(dateFormat), esIndex, esType, bulkSender);
         }
 
     }
@@ -201,12 +201,10 @@ public class ElasticSearchRestAppender extends AbstractAppender {
         return new Builder<B>().asBuilder();
     }
     
-	private static final String HTTP_METHOD = "POST";
     private final Lock lock = new ReentrantLock();
-    private final RestClient restClient;
+    private final BulkSender bulkSender;
     private final String index;
-    private final String type;
-    private final HttpHost[] hosts; 
+    private final String type; 
     private final DateFormat dateFormat;
     private final String bulkItemFormat;
     private final int maxBulkSize;
@@ -227,7 +225,7 @@ public class ElasticSearchRestAppender extends AbstractAppender {
      */
     protected ElasticSearchRestAppender(String name, Filter filter, Layout<? extends Serializable> layout, final boolean ignoreExceptions,
     		final long maxDelayTime, final int maxBulkSize, DateFormat dateFormat,
-    		String index, String type, String user, String password, HttpHost... hosts) {
+    		String index, String type, BulkSender bulkSender) {
         super(name, filter, layout, ignoreExceptions);
         this.buffered = new ArrayList<>();
         this.timer = null;
@@ -235,28 +233,10 @@ public class ElasticSearchRestAppender extends AbstractAppender {
         this.maxDelayTime = maxDelayTime;
         this.index = index;
         this.type = type;
-        this.hosts = hosts;
+        this.bulkSender = bulkSender;
         this.dateFormat = dateFormat;
         this.bulkItemFormat = String.format("{ \"index\" : { \"_index\" : \"%s%%s\", \"_type\" : \"%s\" } }%n%%s%n", index, type);
-        this.restClient = initClient(user, password, hosts);
         this.validate();
-    }
-    
-    private static RestClient initClient(String user, String password, HttpHost... hosts) {
-    	return RestClient.builder(hosts)
-			.setHttpClientConfigCallback(new RestClientBuilder.HttpClientConfigCallback() {
-				@Override
-				public HttpAsyncClientBuilder customizeHttpClient(HttpAsyncClientBuilder httpClientBuilder) {
-					if (!Strings.isBlank(user)) {
-						CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
-						credentialsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials(user, password));
-		                return httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider);
-					} else {
-						return httpClientBuilder;
-					}
-				}
-	        })
-			.build();
     }
     
     private void validate() {
@@ -280,7 +260,7 @@ public class ElasticSearchRestAppender extends AbstractAppender {
         try {
         	String json = new String(getLayout().toByteArray(event));
         	buffered.add(getBulkItem(json));
-        	this.checkSendToEs();        	
+        	this.check();        	
         } catch (Exception ex) {
             if (!ignoreExceptions()) {
                 throw new AppenderLoggingException(ex);
@@ -299,11 +279,11 @@ public class ElasticSearchRestAppender extends AbstractAppender {
 		}
     }
     
-    private void checkSendToEs() {
+    private void check() {
     	if (this.maxBulkSize == 0 && this.maxDelayTime == 0) {
-    		sendToEs();
+    		send();
     	} else if (this.maxBulkSize > 0 && buffered.size() >= this.maxBulkSize) {
-    		sendToEs();
+    		send();
     	} else if (this.maxDelayTime > 0 && timer == null) {
     		timer = new Timer();
     		timer.schedule(new TimerTask() {				
@@ -311,7 +291,7 @@ public class ElasticSearchRestAppender extends AbstractAppender {
 				public void run() {
 					lock.lock();
 					try {
-						sendToEs();
+						send();
 					} finally {
 						lock.unlock();
 					}
@@ -320,7 +300,7 @@ public class ElasticSearchRestAppender extends AbstractAppender {
     	}
     }
     
-    private void sendToEs() {
+    private void send() {
     	try {
 			cancelTimer();
     		if (buffered.size() > 0) {
@@ -328,12 +308,8 @@ public class ElasticSearchRestAppender extends AbstractAppender {
 	    		for (String bulkItem : buffered) {
 	    		    bulkRequestBody.append(bulkItem);
 	    		}
-	        	HttpEntity entity = new NStringEntity(bulkRequestBody.toString(), ContentType.APPLICATION_JSON);
 	        	try {
-					Response response = this.restClient.performRequest(HTTP_METHOD, "_bulk", Collections.emptyMap(), entity);
-					if (response.getStatusLine().getStatusCode() >= 300) {
-						throw new HttpResponseException(response.getStatusLine().getStatusCode(), response.getStatusLine().getReasonPhrase());
-					}
+	        		this.bulkSender.send(bulkRequestBody.toString());
 				} catch (Exception ex) {
 		            if (!ignoreExceptions()) {
 		                throw new AppenderLoggingException(ex);
@@ -350,7 +326,7 @@ public class ElasticSearchRestAppender extends AbstractAppender {
     @Override
     public void stop() {
     	this.timer.cancel();
-    	this.sendToEs();
+    	this.send();
     	super.stop();
     }
 
@@ -374,16 +350,12 @@ public class ElasticSearchRestAppender extends AbstractAppender {
 		return maxDelayTime;
 	}
 
-	public RestClient getRestClient() {
-		return restClient;
+	public BulkSender getBulkSender() {
+		return bulkSender;
 	}
 
 	public int getMaxBulkSize() {
 		return maxBulkSize;
-	}
-
-	public HttpHost[] getHosts() {
-		return hosts;
 	}
 
 }

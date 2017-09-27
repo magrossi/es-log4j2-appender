@@ -32,8 +32,11 @@ dependencies {
     compile 'org.elasticsearch.client:rest:5.5.2'
 
     // Json dependencies
-    compile 'com.fasterxml.jackson.core:jackson-core:2.9.1'
-    compile 'com.fasterxml.jackson.core:jackson-databind:2.9.1'
+    testCompile 'com.fasterxml.jackson.core:jackson-core:2.9.1'
+    testCompile 'com.fasterxml.jackson.core:jackson-databind:2.9.1'
+
+	// Mockito dependencies
+	testCompile 'org.mockito:mockito-all:1.10.19'
 
     // JUnit test framework
     testImplementation 'junit:junit:4.12'
