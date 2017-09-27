@@ -13,7 +13,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.magrossi.log4j2.elasticsearch;
+package com.github.magrossi.log4j2.elasticsearch;
 
 import java.net.InetAddress;
 import org.apache.http.HttpHost;
