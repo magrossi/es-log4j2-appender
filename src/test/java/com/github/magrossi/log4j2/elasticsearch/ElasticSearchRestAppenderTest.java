@@ -41,6 +41,7 @@ import org.apache.logging.log4j.core.Logger;
 import org.apache.logging.log4j.core.LoggerContext;
 import org.apache.logging.log4j.core.config.Configurator;
 import org.apache.logging.log4j.core.impl.Log4jLogEvent;
+import org.apache.logging.log4j.core.layout.JsonLayout;
 import org.elasticsearch.client.Response;
 import org.elasticsearch.client.RestClient;
 import org.junit.Test;
@@ -198,8 +199,18 @@ public class ElasticSearchRestAppenderTest {
 		assertEquals(123, host.getPort());
 		assertEquals(address, host.getAddress());
 		
+		JsonLayout layout = JsonLayout.newBuilder()
+    			.setCompact(true)
+    			.setIncludeStacktrace(true)
+    			.setLocationInfo(true)
+    			.setProperties(true)
+    			.build();
+		
 		ElasticSearchRestAppender appender = ElasticSearchRestAppender.newBuilder()
 				.withName("builder-tests")
+				.withIndex("test-index-")
+				.withType("test-type")
+				.withLayout(layout)
 				.withCredentials("test-user", "test-pwd")
 				.withDateFormat("dd-MM-yyyy")
 				.withHosts(host)
@@ -221,19 +232,26 @@ public class ElasticSearchRestAppenderTest {
 		assertNotNull(sender.getRestClient());
 		assertEquals("test-user", sender.getUser());
 		assertEquals("test-pwd", sender.getPassword());
+		assertEquals("test-index-", appender.getIndex());
+		assertEquals("test-type", appender.getType());
+		assertEquals(layout, appender.getLayout());
+		
 		
 	}
 
+	/**
+	 * Builder tests with custom sender.
+	 */
 	@Test
 	public void builderTestsWithCustomSender() {
 		BulkSender sender = Mockito.mock(BulkSender.class);
 		ElasticSearchRestAppender appender = ElasticSearchRestAppender.newBuilder()
 				.withName("builder-tests-with-custom-sender")
 				.withBulkSender(sender)
-				.withMaxBulkSize(0)
-				.withMaxDelayTime(0L)
 				.build();
 		assertEquals(sender, appender.getBulkSender());
+		assertEquals(200, appender.getMaxBulkSize());
+		assertEquals(2000L, appender.getMaxDelayTime());
 	}
 	
 	/**
