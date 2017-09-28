@@ -71,10 +71,10 @@ public class ElasticSearchRestAppender extends AbstractAppender {
         private String password;
 
         @PluginBuilderAttribute
-        private Integer maxBulkSize;
+        private Integer maxBulkSize = null;
         
         @PluginBuilderAttribute
-        private Long maxDelayTime;
+        private Long maxDelayTime = null;
         
         @PluginElement("Hosts")
         @Required(message = "No Elastic hosts provided")
