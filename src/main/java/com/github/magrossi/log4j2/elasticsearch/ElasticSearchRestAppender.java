@@ -325,7 +325,7 @@ public class ElasticSearchRestAppender extends AbstractAppender {
     
     @Override
     public void stop() {
-    	cancelTimer()
+    	cancelTimer();
     	this.send();
     	super.stop();
     }
