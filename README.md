@@ -8,3 +8,12 @@ This is a simple appender that sends your log data JSON formatted directly to El
 Any combination of the two options can be used. Setting any to `0` effectively disables it, if both are set to `0` logs are sent one by one as soon as they are received.
 
 The appender uses the `JSONLayout` by default, but a custom layout can be provided. The only requirement is that the layout produces an `application/json` content type.
+
+## Maven Central Dependency
+```xml
+<dependency>
+  <groupId>com.github.magrossi</groupId>
+  <artifactId>log4j2-elasticsearch-appender</artifactId>
+  <version>0.1.0</version>
+</dependency>
+```
