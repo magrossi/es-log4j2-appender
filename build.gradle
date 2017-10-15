@@ -84,50 +84,50 @@ artifacts {
     archives javadocJar, sourcesJar
 }
 
-signing {
-    sign configurations.archives
-}
+//signing {
+//    sign configurations.archives
+//}
 
-uploadArchives {
-    repositories {
-        mavenDeployer {
-            beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
-
-            repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
-                authentication(userName: ossrhUsername, password: ossrhPassword)
-            }
-
-            snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
-                authentication(userName: ossrhUsername, password: ossrhPassword)
-            }
-
-            pom.project {
-                name 'Log4J2 ElasticSearch REST Appender'
-                packaging 'jar'
-                description 'An ElasticSearch appender for Log4J2.'
-                url 'https://github.com/magrossi/es-log4j2-appender'
-
-                scm {
-                    connection 'scm:git:git@github.com:magrossi/es-log4j2-appender.git'
-                    developerConnection 'scm:git:git@github.com:magrossi/es-log4j2-appender.git'
-                    url 'git@github.com:magrossi/es-log4j2-appender.git'
-                }
-
-                licenses {
-                    license {
-                        name 'The Apache License, Version 2.0'
-                        url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-                    }
-                }
-
-                developers {
-                    developer {
-                        id 'magrossi'
-                        name 'Marcelo Grossi'
-                        email 'magrossi@gmail.com'
-                    }
-                }
-            }
-        }
-    }
-}
+//uploadArchives {
+//    repositories {
+//        mavenDeployer {
+//            beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+//
+//            repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+//                authentication(userName: ossrhUsername, password: ossrhPassword)
+//            }
+//
+//            snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
+//                authentication(userName: ossrhUsername, password: ossrhPassword)
+//            }
+//
+//            pom.project {
+//                name 'Log4J2 ElasticSearch REST Appender'
+//                packaging 'jar'
+//                description 'An ElasticSearch appender for Log4J2.'
+//                url 'https://github.com/magrossi/es-log4j2-appender'
+//
+//                scm {
+//                    connection 'scm:git:git@github.com:magrossi/es-log4j2-appender.git'
+//                    developerConnection 'scm:git:git@github.com:magrossi/es-log4j2-appender.git'
+//                    url 'git@github.com:magrossi/es-log4j2-appender.git'
+//                }
+//
+//                licenses {
+//                    license {
+//                        name 'The Apache License, Version 2.0'
+//                        url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+//                    }
+//                }
+//
+//                developers {
+//                    developer {
+//                        id 'magrossi'
+//                        name 'Marcelo Grossi'
+//                        email 'magrossi@gmail.com'
+//                    }
+//                }
+//            }
+//        }
+//    }
+//}
