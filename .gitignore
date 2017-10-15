@@ -10,7 +10,7 @@ out/
 gradle-app.setting
 
 # Ignore Gradle Properties file (that has sensitive info)
-gradle.properties
+prod-gradle.properties
 
 # Avoid ignoring Gradle wrapper jar file (.jar files are usually ignored)
 !gradle-wrapper.jar
