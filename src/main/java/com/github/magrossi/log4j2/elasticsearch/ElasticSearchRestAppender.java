@@ -211,17 +211,18 @@ public class ElasticSearchRestAppender extends AbstractAppender {
     private Timer timer;
     private final long maxDelayTime;
     private final List<String> buffered;
-    
+
     /**
      * @param name The appender name
      * @param filter The appender filter
+     * @param layout The layout
      * @param ignoreExceptions True if we are to ignore exceptions during logging
-     * @param maxDelayTime Max delay time before sending the messages to the database
+     * @param maxDelayTime Max delay time in millis before sending the messages to the database
      * @param maxBulkSize Max buffer size of messages held in memory before sending
      * @param dateFormat Format of the timestamp that is appended to the esIndex name while saving
-     * @param esIndex The ElasticSearch destination esIndex
-     * @param esType The ElasticSearch destination esType
-     * @param hosts List of ElasticSearch hosts in the cluster
+     * @param index The ElasticSearch destination index
+     * @param type The ElasticSearch destination type
+     * @param bulkSender The Elastic bulk sender
      */
     protected ElasticSearchRestAppender(String name, Filter filter, Layout<? extends Serializable> layout, final boolean ignoreExceptions,
     		final long maxDelayTime, final int maxBulkSize, DateFormat dateFormat,

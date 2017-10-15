@@ -15,13 +15,29 @@
  */
 
 repositories {
-    jcenter()
+    mavenCentral()
+}
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath "io.codearte.gradle.nexus:gradle-nexus-staging-plugin:0.11.0"
+    }
 }
 
 apply plugin: 'java'
 apply plugin: 'jacoco'
 apply plugin: 'eclipse'
 apply plugin: 'idea'
+apply plugin: 'maven'
+apply plugin: 'signing'
+apply plugin: 'io.codearte.nexus-staging'
+
+group = "com.github.magrossi"
+archivesBaseName = "log4j2-elasticsearch-appender"
+version = "0.1.0"
 
 dependencies {
     // Log4j 2 Dependencies
@@ -43,7 +59,6 @@ dependencies {
 
 	// Mockito dependencies
 	testImplementation 'org.mockito:mockito-core:1.10.19'
-
 }
 
 jacocoTestReport {
@@ -54,3 +69,65 @@ jacocoTestReport {
 }
 
 check.dependsOn jacocoTestReport
+
+task javadocJar(type: Jar) {
+    classifier = 'javadoc'
+    from javadoc
+}
+
+task sourcesJar(type: Jar) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+artifacts {
+    archives javadocJar, sourcesJar
+}
+
+signing {
+    sign configurations.archives
+}
+
+uploadArchives {
+    repositories {
+        mavenDeployer {
+            beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+
+            repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+                authentication(userName: ossrhUsername, password: ossrhPassword)
+            }
+
+            snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
+                authentication(userName: ossrhUsername, password: ossrhPassword)
+            }
+
+            pom.project {
+                name 'Log4J2 ElasticSearch REST Appender'
+                packaging 'jar'
+                description 'An ElasticSearch appender for Log4J2.'
+                url 'https://github.com/magrossi/es-log4j2-appender'
+
+                scm {
+                    connection 'scm:git:git@github.com:magrossi/es-log4j2-appender.git'
+                    developerConnection 'scm:git:git@github.com:magrossi/es-log4j2-appender.git'
+                    url 'git@github.com:magrossi/es-log4j2-appender.git'
+                }
+
+                licenses {
+                    license {
+                        name 'The Apache License, Version 2.0'
+                        url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+
+                developers {
+                    developer {
+                        id 'magrossi'
+                        name 'Marcelo Grossi'
+                        email 'magrossi@gmail.com'
+                    }
+                }
+            }
+        }
+    }
+}
