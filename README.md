@@ -1,4 +1,9 @@
-# ElasticSearch Log4j2 Appender [![travis](https://travis-ci.org/magrossi/es-log4j2-appender.svg?branch=master)](https://travis-ci.org/magrossi/es-log4j2-appender) [![codecov](https://codecov.io/gh/magrossi/es-log4j2-appender/branch/master/graph/badge.svg)](https://codecov.io/gh/magrossi/es-log4j2-appender)
+# ElasticSearch Log4j2 Appender
+
+[![Build Status](https://travis-ci.org/magrossi/es-log4j2-appender.svg?branch=master)](https://travis-ci.org/magrossi/es-log4j2-appender)
+[![Code Coverage](https://codecov.io/gh/magrossi/es-log4j2-appender/branch/master/graph/badge.svg)](https://codecov.io/gh/magrossi/es-log4j2-appender)
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.github.magrossi/log4j2-elasticsearch-appender/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.github.magrossi/log4j2-elasticsearch-appender)
+
 An ElasticSearch REST appender for Log4j2
 
 This is a simple appender that sends your log data JSON formatted directly to ElasticSearch via the REST API. There are options to buffer the logs before sending in bulk. Two options are provided for the buffering of logs.
@@ -8,12 +13,3 @@ This is a simple appender that sends your log data JSON formatted directly to El
 Any combination of the two options can be used. Setting any to `0` effectively disables it, if both are set to `0` logs are sent one by one as soon as they are received.
 
 The appender uses the `JSONLayout` by default, but a custom layout can be provided. The only requirement is that the layout produces an `application/json` content type.
-
-## Maven Central Dependency
-```xml
-<dependency>
-  <groupId>com.github.magrossi</groupId>
-  <artifactId>log4j2-elasticsearch-appender</artifactId>
-  <version>0.1.0</version>
-</dependency>
-```
