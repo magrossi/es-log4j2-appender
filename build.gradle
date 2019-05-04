@@ -36,9 +36,9 @@ apply plugin: 'jacoco'
 apply plugin: 'eclipse'
 apply plugin: 'idea'
 apply plugin: 'docker-compose'
-//apply plugin: 'maven'
-//apply plugin: 'signing'
-//apply plugin: 'io.codearte.nexus-staging'
+apply plugin: 'maven'
+apply plugin: 'signing'
+apply plugin: 'io.codearte.nexus-staging'
 
 group = "com.github.magrossi"
 archivesBaseName = "log4j2-elasticsearch-appender"
@@ -58,6 +58,19 @@ dependencies {
     testImplementation 'org.mockito:mockito-core:1.10.19'
     testImplementation 'org.powermock:powermock-module-junit4:1.6.4'
     testImplementation 'org.powermock:powermock-api-mockito:1.6.4'
+}
+
+def releaseRepo = project.hasProperty("ossrhReleasesRepo") ? ossrhReleasesRepo : System.getenv("ossrhReleasesRepo")
+def snapshotRepo = project.hasProperty("ossrhSnapshotsRepo") ? ossrhSnapshotsRepo : System.getenv("ossrhSnapshotsRepo")
+def repoUser = project.hasProperty("ossrhUsername") ? ossrhUsername : System.getenv("ossrhUsername")
+def repoPwd = project.hasProperty("ossrhPassword") ? ossrhPassword : System.getenv("ossrhPassword")
+
+signing {
+    sign configurations.archives
+}
+
+if ("true" == System.getenv("TRAVIS")) {
+    signArchives.enabled = false
 }
 
 jacocoTestReport {
@@ -84,50 +97,46 @@ artifacts {
     archives javadocJar, sourcesJar
 }
 
-//signing {
-//    sign configurations.archives
-//}
+uploadArchives {
+    repositories {
+        mavenDeployer {
+            beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
 
-//uploadArchives {
-//    repositories {
-//        mavenDeployer {
-//            beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
-//
-//            repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
-//                authentication(userName: ossrhUsername, password: ossrhPassword)
-//            }
-//
-//            snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
-//                authentication(userName: ossrhUsername, password: ossrhPassword)
-//            }
-//
-//            pom.project {
-//                name 'Log4J2 ElasticSearch REST Appender'
-//                packaging 'jar'
-//                description 'An ElasticSearch appender for Log4J2.'
-//                url 'https://github.com/magrossi/es-log4j2-appender'
-//
-//                scm {
-//                    connection 'scm:git:git@github.com:magrossi/es-log4j2-appender.git'
-//                    developerConnection 'scm:git:git@github.com:magrossi/es-log4j2-appender.git'
-//                    url 'git@github.com:magrossi/es-log4j2-appender.git'
-//                }
-//
-//                licenses {
-//                    license {
-//                        name 'The Apache License, Version 2.0'
-//                        url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-//                    }
-//                }
-//
-//                developers {
-//                    developer {
-//                        id 'magrossi'
-//                        name 'Marcelo Grossi'
-//                        email 'magrossi@gmail.com'
-//                    }
-//                }
-//            }
-//        }
-//    }
-//}
+            repository(url: releaseRepo) {
+                authentication(userName: repoUser, password: repoPwd)
+            }
+
+            snapshotRepository(url: snapshotRepo) {
+                authentication(userName: repoUser, password: repoPwd)
+            }
+
+            pom.project {
+                name 'Log4J2 ElasticSearch REST Appender'
+                packaging 'jar'
+                description 'An ElasticSearch appender for Log4J2.'
+                url 'https://github.com/magrossi/es-log4j2-appender'
+
+                scm {
+                    connection 'scm:git:git@github.com:magrossi/es-log4j2-appender.git'
+                    developerConnection 'scm:git:git@github.com:magrossi/es-log4j2-appender.git'
+                    url 'git@github.com:magrossi/es-log4j2-appender.git'
+                }
+
+                licenses {
+                    license {
+                        name 'The Apache License, Version 2.0'
+                        url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+
+                developers {
+                    developer {
+                        id 'magrossi'
+                        name 'Marcelo Grossi'
+                        email 'magrossi@gmail.com'
+                    }
+                }
+            }
+        }
+    }
+}
