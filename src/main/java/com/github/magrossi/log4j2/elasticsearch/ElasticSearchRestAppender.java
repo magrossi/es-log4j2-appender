@@ -15,30 +15,36 @@
  */
 package com.github.magrossi.log4j2.elasticsearch;
 
+import org.apache.http.HttpHost;
+import org.apache.http.auth.AuthScope;
+import org.apache.http.auth.UsernamePasswordCredentials;
+import org.apache.http.client.CredentialsProvider;
+import org.apache.http.impl.client.BasicCredentialsProvider;
+import org.apache.logging.log4j.core.Filter;
+import org.apache.logging.log4j.core.Layout;
+import org.apache.logging.log4j.core.LogEvent;
+import org.apache.logging.log4j.core.appender.AbstractAppender;
+import org.apache.logging.log4j.core.appender.AppenderLoggingException;
+import org.apache.logging.log4j.core.config.plugins.Plugin;
+import org.apache.logging.log4j.core.config.plugins.PluginBuilderAttribute;
+import org.apache.logging.log4j.core.config.plugins.PluginBuilderFactory;
+import org.apache.logging.log4j.core.config.plugins.PluginElement;
+import org.apache.logging.log4j.core.config.plugins.validation.constraints.Required;
+import org.apache.logging.log4j.core.layout.JsonLayout;
+import org.apache.logging.log4j.util.Strings;
+import org.elasticsearch.client.RestClient;
+import org.elasticsearch.client.RestClientBuilder;
+
 import java.io.Serializable;
 import java.nio.charset.Charset;
 import java.security.InvalidParameterException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.concurrent.locks.*;
+import java.util.*;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
-import org.apache.http.HttpHost;
-import org.apache.logging.log4j.core.appender.AbstractAppender;
-import org.apache.logging.log4j.core.appender.AppenderLoggingException;
-import org.apache.logging.log4j.core.config.plugins.*;
-import org.apache.logging.log4j.core.config.plugins.validation.constraints.Required;
-import org.apache.logging.log4j.core.layout.JsonLayout;
-import org.apache.logging.log4j.util.Strings;
-import org.apache.logging.log4j.core.Filter;
-import org.apache.logging.log4j.core.Layout;
-import org.apache.logging.log4j.core.LogEvent;
 import static org.apache.logging.log4j.core.Appender.ELEMENT_TYPE;
 import static org.apache.logging.log4j.core.Core.CATEGORY_NAME;
 
@@ -47,9 +53,11 @@ import static org.apache.logging.log4j.core.Core.CATEGORY_NAME;
  * Log messages are buffered and sent at pre-defined interval or
  * when the message buffer gets filled (whichever comes first). * 
  */
+@SuppressWarnings("WeakerAccess")
 @Plugin(name = "ElasticSearch", category = CATEGORY_NAME, elementType = ELEMENT_TYPE, printObject = true)
 public class ElasticSearchRestAppender extends AbstractAppender {
 
+    @SuppressWarnings("WeakerAccess")
     public static class Builder<B extends Builder<B>> extends AbstractAppender.Builder<B>
 		implements org.apache.logging.log4j.core.util.Builder<AbstractAppender> {
 
@@ -163,7 +171,7 @@ public class ElasticSearchRestAppender extends AbstractAppender {
     			LOGGER.warn("No hosts found for appender {} using [http://localhost:9200].", getName());
     			httpHosts = new HttpHost[] { new HttpHost("localhost", 9200) };
             } else {
-            	httpHosts = Arrays.asList(hosts).stream()
+            	httpHosts = Arrays.stream(hosts)
             			.map(HttpAddress::getHttpHost)
             			.collect(Collectors.toList())
             			.toArray(new HttpHost[hosts.length]);
@@ -185,13 +193,26 @@ public class ElasticSearchRestAppender extends AbstractAppender {
             }
             
             if (bulkSender == null) {
-            	bulkSender = new ElasticBulkSender(user, password, httpHosts);
+                RestClient restClient = RestClient.builder(httpHosts).setHttpClientConfigCallback(httpClientConfigCallback(user, password)).build();
+                bulkSender = new ElasticBulkSender(restClient);
             } else {
             	LOGGER.warn("Appender {} using custom bulk sender {}.", getName(), bulkSender.getClass().getName());
             }
 
             return new ElasticSearchRestAppender(getName(), getFilter(), getOrCreateLayout(), isIgnoreExceptions(),
             		maxDelayTime, maxBulkSize, new SimpleDateFormat(dateFormat), esIndex, esType, bulkSender);
+        }
+
+        static RestClientBuilder.HttpClientConfigCallback httpClientConfigCallback(String user, String password) {
+            return httpClientBuilder -> {
+                if (!Strings.isBlank(user)) {
+                    CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
+                    credentialsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials(user, password));
+                    return httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider);
+                } else {
+                    return httpClientBuilder;
+                }
+            };
         }
 
     }
@@ -338,25 +359,4 @@ public class ElasticSearchRestAppender extends AbstractAppender {
 	protected String getType() {
 		return type;
 	}
-
-	protected DateFormat getDateFormat() {
-		return dateFormat;
-	}
-
-	protected int getmaxBulkSize() {
-		return maxBulkSize;
-	}
-
-	protected long getMaxDelayTime() {
-		return maxDelayTime;
-	}
-
-	public BulkSender getBulkSender() {
-		return bulkSender;
-	}
-
-	public int getMaxBulkSize() {
-		return maxBulkSize;
-	}
-
 }
