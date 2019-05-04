@@ -28,6 +28,7 @@ buildscript {
     dependencies {
         classpath "io.codearte.gradle.nexus:gradle-nexus-staging-plugin:0.11.0"
         classpath "com.avast.gradle:gradle-docker-compose-plugin:0.9.3"
+        classpath "pl.allegro.tech.build:axion-release-plugin:1.10.1"
     }
 }
 
@@ -39,10 +40,17 @@ apply plugin: 'docker-compose'
 apply plugin: 'maven'
 apply plugin: 'signing'
 apply plugin: 'io.codearte.nexus-staging'
+apply plugin: 'pl.allegro.tech.build.axion-release'
+
+scmVersion {
+    tag {
+        initialVersion = {config, position ->  "1.0.0" }
+    }
+}
 
 group = "com.github.magrossi"
 archivesBaseName = "log4j2-elasticsearch-appender"
-version = "0.1.0"
+version = scmVersion.version
 
 dependencies {
     implementation 'org.apache.logging.log4j:log4j-api:2.8.2'
