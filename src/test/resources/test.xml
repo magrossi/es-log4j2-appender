@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Copyright 2017 Marcelo Grossi
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0*
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<Configuration status="debug" strict="true" name="ElasticSearchAppenderTest"
+               packages="com.github.magrossi.log4j2.elasticsearch">
+    <Appenders>
+        <!-- Explicit configuration -->
+        <Appender type="ElasticSearch" name="integration-test" maxBulkSize="0" maxDelayTime="0"
+                  esIndex="es-appender-test-" esType="log">
+            <!-- Multiple hosts are supported here -->
+            <Host type="HttpAddress" scheme="http" host="localhost" port="9200"/>
+        </Appender>
+        <!-- Shorter configuration as host defaults to [http://localhost:9200] -->
+        <Appender type="ElasticSearch" name="integration-test-after-5" maxBulkSize="5" maxDelayTime="0"
+                  esIndex="es-appender-test-" esType="log">
+            <Host type="HttpAddress"/>
+        </Appender>
+    </Appenders>
+    <Loggers>
+        <Logger name="integration-test" level="debug" additivity="false">
+            <AppenderRef ref="integration-test"/>
+        </Logger>
+        <Logger name="integration-test-after-5" level="debug" additivity="false">
+            <AppenderRef ref="integration-test-after-5"/>
+        </Logger>
+    </Loggers>
+</Configuration>

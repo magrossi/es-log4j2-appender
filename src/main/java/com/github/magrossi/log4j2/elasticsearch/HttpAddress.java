@@ -1,4 +1,4 @@
-/*  
+/*
  *  Copyright 2017 Marcelo Grossi
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,7 +15,6 @@
  */
 package com.github.magrossi.log4j2.elasticsearch;
 
-import java.net.InetAddress;
 import org.apache.http.HttpHost;
 import org.apache.logging.log4j.core.config.Node;
 import org.apache.logging.log4j.core.config.plugins.Plugin;
@@ -25,24 +24,25 @@ import org.apache.logging.log4j.core.config.plugins.validation.constraints.Requi
 import org.apache.logging.log4j.core.config.plugins.validation.constraints.ValidHost;
 import org.apache.logging.log4j.core.config.plugins.validation.constraints.ValidPort;
 
+import java.net.InetAddress;
+
 /**
  * Plugin to hold an http address.
  *
  * @see HttpHost
  */
+@SuppressWarnings({"WeakerAccess", "unused"})
 @Plugin(name = "HttpAddress", category = Node.CATEGORY, printObject = true)
 public class HttpAddress {
-	
-	public static int DEFAULT_PORT = 9200;
-	
+
     private HttpHost httpHost;
 
     private HttpAddress(final InetAddress host, final int port, final String scheme) {
-    	this.httpHost = new HttpHost(host, port, scheme);
+        this.httpHost = new HttpHost(host, port, scheme);
     }
 
     public HttpHost getHttpHost() {
-    	return httpHost;
+        return httpHost;
     }
 
     public int getPort() {
@@ -84,7 +84,7 @@ public class HttpAddress {
             this.scheme = scheme;
             return this;
         }
-        
+
         public Builder withHost(final InetAddress host) {
             this.host = host;
             return this;

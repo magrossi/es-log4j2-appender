@@ -64,7 +64,7 @@ public class ElasticSearchRestAppenderIT {
     }
 
     private Logger getLogger(String appender) {
-        final LoggerContext loggerContext = Configurator.initialize(UUID.randomUUID().toString(), "src/test/resources/test.properties");
+        final LoggerContext loggerContext = Configurator.initialize(UUID.randomUUID().toString(), "src/test/resources/test.xml");
         Logger logger = loggerContext.getLogger(appender);
         logger.getAppenders().clear();
         logger.addAppender(loggerContext.getConfiguration().getAppenders().get(appender));
