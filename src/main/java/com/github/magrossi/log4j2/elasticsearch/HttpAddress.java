@@ -31,7 +31,7 @@ import java.net.InetAddress;
  *
  * @see HttpHost
  */
-@SuppressWarnings({"WeakerAccess", "unused"})
+@SuppressWarnings("WeakerAccess")
 @Plugin(name = "HttpAddress", category = Node.CATEGORY, printObject = true)
 public class HttpAddress {
 
@@ -43,22 +43,6 @@ public class HttpAddress {
 
     public HttpHost getHttpHost() {
         return httpHost;
-    }
-
-    public int getPort() {
-        return httpHost.getPort();
-    }
-
-    public InetAddress getAddress() {
-        return httpHost.getAddress();
-    }
-
-    public String getHostName() {
-        return httpHost.getHostName();
-    }
-
-    public String getSchemeName() {
-        return httpHost.getSchemeName();
     }
 
     @PluginBuilderFactory

@@ -18,10 +18,14 @@ package com.github.magrossi.log4j2.elasticsearch;
 import org.apache.http.client.CredentialsProvider;
 import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
 import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.core.appender.AppenderLoggingException;
 import org.apache.logging.log4j.core.impl.Log4jLogEvent;
 import org.apache.logging.log4j.core.layout.JsonLayout;
+import org.apache.logging.log4j.core.layout.PatternLayout;
 import org.elasticsearch.client.RestClientBuilder;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.stubbing.Answer;
@@ -29,6 +33,8 @@ import org.powermock.modules.junit4.PowerMockRunner;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.security.InvalidParameterException;
+import java.util.TimerTask;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
@@ -41,6 +47,9 @@ public class ElasticSearchRestAppenderTest {
 
 	private static final Log4jLogEvent SOME_LOG_EVENT = Log4jLogEvent.newBuilder().setLevel(Level.ERROR).build();
 	private static final String SOME_NAME = "someAppenderName";
+
+	@Rule
+	public ExpectedException expectedException = ExpectedException.none();
 
 	@Mock
 	private HttpAsyncClientBuilder mockHttpAsyncClientBuilder;
@@ -102,6 +111,85 @@ public class ElasticSearchRestAppenderTest {
 		httpClientConfigCallback.customizeHttpClient(mockHttpAsyncClientBuilder);
 
 		verifyZeroInteractions(mockHttpAsyncClientBuilder);
+	}
+
+	@Test
+	public void throwsInvalidParameterExceptionIfLayourIsNull() {
+		expectedException.expect(InvalidParameterException.class);
+		expectedException.expectMessage("Layout not provided");
+
+		new ElasticSearchRestAppender(SOME_NAME, null, null, true, 0, 0, null, "index", "type", null);
+	}
+
+	@Test
+	public void throwsInvalidParameterExceptionIfLayourIsNotJson() {
+		expectedException.expect(InvalidParameterException.class);
+		expectedException.expectMessage("Layout must produce an \"application/json\" content type. Instead it produces \"text/plain\"");
+
+		new ElasticSearchRestAppender(SOME_NAME, null, PatternLayout.createDefaultLayout(), true, 0, 0, null, "index", "type", null);
+	}
+
+	@Test
+	public void ignoresExceptionsWhileBufferingLogsIfIgnoreExceptionIsTrue() {
+		ElasticSearchRestAppender appender = new ElasticSearchRestAppender(SOME_NAME, null, JsonLayout.createDefaultLayout(), true, 0, 0, null, "index", "type", null);
+
+		appender.append(SOME_LOG_EVENT);
+	}
+
+	@Test
+	public void ignoresExceptionsWhileSendingToEsIfIgnoresExceptionIsTrue() throws IOException {
+		doThrow(new RuntimeException("someErrorMessage")).when(mockBulkSender).send(any());
+		ElasticSearchRestAppender appender = ((ElasticSearchRestAppender.Builder)baseBuilder().withIgnoreExceptions(true)).build();
+
+		appender.append(SOME_LOG_EVENT);
+	}
+
+	@Test
+	public void throwsExceptionsWhileSendingToEsIfIgnoresExceptionIsFalse() throws IOException {
+		doThrow(new RuntimeException("someErrorMessage")).when(mockBulkSender).send(any());
+		ElasticSearchRestAppender appender = baseBuilder().build();
+
+		expectedException.expect(AppenderLoggingException.class);
+		expectedException.expectMessage("someErrorMessage");
+
+		appender.append(SOME_LOG_EVENT);
+	}
+
+	@Test
+	public void throwsAppenderLoggingExceptionWhileBufferingLogsIfIgnoreExceptionIsFalse() {
+		expectedException.expect(AppenderLoggingException.class);
+
+		ElasticSearchRestAppender appender = new ElasticSearchRestAppender(SOME_NAME, null, JsonLayout.createDefaultLayout(), false, 0, 0, null, "index", "type", null);
+
+		appender.append(SOME_LOG_EVENT);
+	}
+
+	@Test
+	public void triesToSendBufferedMessagesBeforeAppenderIsDestroyed() throws IOException {
+		ElasticSearchRestAppender appender = ElasticSearchRestAppender.newBuilder().withName(SOME_NAME).withBulkSender(mockBulkSender).build();
+
+		appender.append(SOME_LOG_EVENT);
+
+		appender.stop();
+		verify(mockBulkSender).send(anyString());
+	}
+
+	@Test
+	public void returnsNullWhenNoNameIsProviderFortheBuilder() {
+		ElasticSearchRestAppender appender = ElasticSearchRestAppender.newBuilder().build();
+
+		assertThat(appender).isNull();
+	}
+
+	@Test
+	public void whenDelayExpiresItSendsBufferedLogs() throws IOException {
+		ElasticSearchRestAppender appender = baseBuilder().withMaxBulkSize(2).build();
+		appender.append(SOME_LOG_EVENT); // buffers a log message
+		TimerTask timerTask = appender.timerTask();
+
+		timerTask.run();
+
+		verify(mockBulkSender).send(anyString());
 	}
 
 	private ElasticSearchRestAppender.Builder baseBuilder() {

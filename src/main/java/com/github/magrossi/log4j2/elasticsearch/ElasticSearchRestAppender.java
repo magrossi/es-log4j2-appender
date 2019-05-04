@@ -264,7 +264,7 @@ public class ElasticSearchRestAppender extends AbstractAppender {
     private void validate() {
         if (getLayout() != null) {
         	if (!getLayout().getContentType().toLowerCase().contains("application/json")) {
-        		throw new InvalidParameterException("Layout must produce an \"application/json\" content esType. "
+        		throw new InvalidParameterException("Layout must produce an \"application/json\" content type. "
         										  + "Instead it produces \"" + getLayout().getContentType() + "\"");
         	}
         } else {
@@ -308,20 +308,24 @@ public class ElasticSearchRestAppender extends AbstractAppender {
     		send();
     	} else if (this.maxDelayTime > 0 && timer == null) {
     		timer = new Timer();
-    		timer.schedule(new TimerTask() {				
-				@Override
-				public void run() {
-					lock.lock();
-					try {
-						send();
-					} finally {
-						lock.unlock();
-					}
-				}
-			}, this.maxDelayTime);
+    		timer.schedule(timerTask(), this.maxDelayTime);
     	}
     }
-    
+
+    TimerTask timerTask() {
+        return new TimerTask() {
+            @Override
+            public void run() {
+                lock.lock();
+                try {
+                    send();
+                } finally {
+                    lock.unlock();
+                }
+            }
+        };
+    }
+
     private void send() {
     	try {
 			cancelTimer();
