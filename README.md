@@ -13,3 +13,40 @@ This is a simple appender that sends your log data JSON formatted directly to El
 Any combination of the two options can be used. Setting any to `0` effectively disables it, if both are set to `0` logs are sent one by one as soon as they are received.
 
 The appender uses the `JSONLayout` by default, but a custom layout can be provided. The only requirement is that the layout produces an `application/json` content type.
+
+To use it, simply reference this package into your Log4j2 configuration file, and add the appender with as your ElasticSearch nodes as hosts and you're good to go!
+```xml
+<Configuration status="debug" strict="true" name="ElasticSearchAppenderTest"
+               packages="com.github.magrossi.log4j2.elasticsearch">
+    <Appenders>
+        <!-- Sends logs immediately -->
+        <Appender type="ElasticSearch"
+                  <!-- Your appender name -->
+                  name="ELASTIC"
+                  <!-- Accumulate up to "maxBulkSize" before sending the logs -->
+                  maxBulkSize="0" 
+                  <!-- Waits maxDelayTime (in millis) before sending the logs -->
+                  maxDelayTime="0"
+                  <!-- ElasticSearch index/type configuration -->
+                  esIndex="my-index-"
+                  esType="logs"
+                  <!-- The index name is actually {index}{dateFormat}, so if
+                       esIndex="my-index-", and
+                       dateFormat="yyyyMMdd" (and the current date is 01/01/2001
+                       Then the ElasticSearch index will be resolved to "my-index-20010101" -->
+                  dateFormat="yyyyMMdd"
+                  <!-- ElasticSearch credentials, if required -->
+                  user="your-username"
+                  password="your-password">
+            <!-- List of nodes in your ElasticSearch cluster -->
+            <Host type="HttpAddress" scheme="http" host="my-node-1" port="9200"/>
+            <Host type="HttpAddress" scheme="http" host="my-node-2" port="9200"/>
+        </Appender>
+    </Appenders>
+    <Loggers>
+        <Logger name="ELASTIC_LOGGER" level="debug" additivity="false">
+            <AppenderRef ref="ELASTIC"/>
+        </Logger>
+    </Loggers>
+</Configuration>
+```
