@@ -21,9 +21,13 @@ repositories {
 buildscript {
     repositories {
         mavenCentral()
+        maven {
+            url 'https://dl.bintray.com/avast/maven/'
+        }
     }
     dependencies {
         classpath "io.codearte.gradle.nexus:gradle-nexus-staging-plugin:0.11.0"
+        classpath "com.avast.gradle:gradle-docker-compose-plugin:0.9.3"
     }
 }
 
@@ -31,6 +35,7 @@ apply plugin: 'java'
 apply plugin: 'jacoco'
 apply plugin: 'eclipse'
 apply plugin: 'idea'
+apply plugin: 'docker-compose'
 //apply plugin: 'maven'
 //apply plugin: 'signing'
 //apply plugin: 'io.codearte.nexus-staging'
@@ -40,25 +45,16 @@ archivesBaseName = "log4j2-elasticsearch-appender"
 version = "0.1.0"
 
 dependencies {
-    // Log4j 2 Dependencies
     implementation 'org.apache.logging.log4j:log4j-api:2.8.2'
     implementation 'org.apache.logging.log4j:log4j-core:2.8.2'
 
-	// ElasticSearch Rest Client
-    implementation 'org.elasticsearch.client:rest:5.5.2'
+	implementation 'org.elasticsearch.client:rest:5.5.2'
 
-	// Hamcrest dependencies
 	testImplementation 'org.hamcrest:hamcrest-core:1.3'
-
-    // Json dependencies
     testImplementation 'com.fasterxml.jackson.core:jackson-core:2.9.1'
     testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.9.1'
-
-    // JUnit test framework
-    testImplementation 'junit:junit:4.12'    
-
-	// Mockito dependencies
-	testImplementation 'org.mockito:mockito-core:1.10.19'
+    testImplementation 'junit:junit:4.12'
+    testImplementation 'org.mockito:mockito-core:1.10.19'
 }
 
 jacocoTestReport {
@@ -69,6 +65,7 @@ jacocoTestReport {
 }
 
 check.dependsOn jacocoTestReport
+dockerCompose.isRequiredBy test
 
 task javadocJar(type: Jar) {
     classifier = 'javadoc'
