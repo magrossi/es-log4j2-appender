@@ -3,7 +3,7 @@ build/
 bin/
 out/
 .idea/
-
+.gnupg
 *.iml
 
 # Ignore Gradle GUI config
