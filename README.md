@@ -36,8 +36,8 @@ To use it, simply reference this package into your Log4j2 configuration file, an
                        Then the ElasticSearch index will be resolved to "my-index-20010101" -->
                   dateFormat="yyyyMMdd"
                   <!-- ElasticSearch credentials, if required -->
-                  user="your-username"
-                  password="your-password">
+                  user="${env:myEsUser}"
+                  password="${env:myEsPassword}">
             <!-- List of nodes in your ElasticSearch cluster -->
             <Host type="HttpAddress" scheme="http" host="my-node-1" port="9200"/>
             <Host type="HttpAddress" scheme="http" host="my-node-2" port="9200"/>
